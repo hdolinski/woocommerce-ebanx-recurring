@@ -49,10 +49,6 @@ class WC_Gateway_Ebanx extends WC_Payment_Gateway
     $this->merchant_key        = $this->get_option('merchant_key');
     $this->test_mode           = ($this->get_option('test_mode') == 'yes');
     $this->enable_cc           = true;
-    $this->enable_installments = $this->get_option('enable_installments') == 'yes';
-    $this->max_installments    = intval($this->get_option('max_installments'));
-    $this->interest_mode       = $this->get_option('interest_mode');
-    $this->interest_rate       = floatval($this->get_option('interest_rate'));
 
     // Images
     $this->icon_boleto = WP_PLUGIN_URL . "/" . plugin_basename(dirname(__FILE__)) . '/images/icon_boleto.png';
@@ -112,52 +108,6 @@ class WC_Gateway_Ebanx extends WC_Payment_Gateway
         'type'    => 'textarea',
         'default' => __('Pagamentos para clientes do Brasil.', 'woocommerce'),
         'description' => __('Give the customer instructions for paying via EBANX.', 'woocommerce')
-      ),
-      'enable_installments' => array(
-        'title'   => __('Enable installments', 'woocommerce'),
-        'type'    => 'checkbox',
-        'label'   => __('Enable installments for credit cards payments', 'woocommerce'),
-        'default' => 'no',
-        'description' => ''
-      ),
-      'max_installments' => array(
-        'title'    => __('Maximum installments number', 'woocommerce'),
-        'type'     => 'select',
-        'default'  => '1',
-        'desc_tip' => true,
-        'description' => '',
-        'options' => array(
-          '1' => '1',
-          '2' => '2',
-          '3' => '3',
-          '4' => '4',
-          '5' => '5',
-          '6' => '6',
-          '7' => '7',
-          '8' => '8',
-          '9' => '9',
-          '10' => '10',
-          '11' => '11',
-          '12' => '12'
-        )
-      ),
-      'interest_mode' => array(
-        'title'    => __('Interest calculation method', 'woocommerce'),
-        'type'     => 'select',
-        'default'  => 'simple',
-        'desc_tip' => true,
-        'description' => '',
-        'options' => array(
-          'compound' => 'Compound interest',
-          'simple'   => 'Simple interest'
-        )
-      ),
-      'interest_rate' => array(
-        'title'    => __('Interest rate', 'woocommerce'),
-        'type'     => 'text',
-        'default'  => '0.00',
-        'desc_tip' => true,
-        'description' => ''
       ),
     );
   }
@@ -444,21 +394,6 @@ class WC_Gateway_Ebanx extends WC_Payment_Gateway
         $conn = new PDO("mysql:host=$servername;dbname=$database", $username, $password);
         // set the PDO error mode to exception
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $sql = "CREATE TABLE IF NOT EXISTS `ebanx_token` (
-                `id` INT AUTO_INCREMENT NOT NULL,
-                `data` datetime NOT NULL,
-                `token` varchar(200),
-                `customer_id` varchar(200),
-                `order_id` varchar(200),
-                `currency_code` varchar(200),
-                `birth_date` varchar(200),
-                `payment_type_code` varchar(200),
-                PRIMARY KEY (`id`)) ";
-        $conn->query($sql);
-        $date = date('Y-m-d');
-        $sql = "INSERT INTO ebanx_token (data, token, customer_id, order_id, currency_code, birth_date, payment_type_code)
-                VALUES ('$date', '$token->token', '$customer_id', '$order_id_from_object', '$currency_code', '$birth_date', '$payment_type_code')";
-        $conn->query($sql);
     }
     catch(PDOException $e)
     {
@@ -474,6 +409,38 @@ class WC_Gateway_Ebanx extends WC_Payment_Gateway
 
       if ($response->status == 'SUCCESS')
       {
+        $sql = "CREATE TABLE IF NOT EXISTS `ebanx_token` (
+                `id` INT AUTO_INCREMENT NOT NULL,
+                `data` datetime NOT NULL,
+                `token` varchar(200),
+                `customer_id` varchar(200),
+                `order_id` varchar(200),
+                `currency_code` varchar(200),
+                `birth_date` varchar(200),
+                `payment_type_code` varchar(200),
+                PRIMARY KEY (`id`)) ";
+        $conn->query($sql);
+
+        date_default_timezone_set('America/Sao_Paulo');
+        $month = date('m');
+        $year = date('Y');
+        $day = date('d');
+
+        if ($day > '28' && $month == '02')
+        {
+          $day = '28';
+        }
+        else if ($day == '31')
+        {
+          $day = '01';
+        }
+
+        $date = $year . '-' . $month . '-' . $day;
+
+        $sql = "INSERT INTO ebanx_token (data, token, customer_id, order_id, currency_code, birth_date, payment_type_code)
+                VALUES ('$date', '$token->token', '$customer_id', '$order_id_from_object', '$currency_code', '$birth_date', '$payment_type_code')";
+        $conn->query($sql);
+
         // Clear cart
         $woocommerce->cart->empty_cart();
 
